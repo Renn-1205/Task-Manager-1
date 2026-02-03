@@ -3,6 +3,12 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --primary-green: #4CAF50;
+  --primary-green-light: #81C784;
+  --primary-green-dark: #388E3C;
+  --card-bg: #E8F5E9;
+  --input-border: #C8E6C9;
+  --text-muted: #6B7280;
 }
 
 @theme inline {
@@ -12,15 +18,46 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Custom button styles */
+.btn-primary {
+  background: linear-gradient(135deg, #81C784 0%, #4CAF50 100%);
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #66BB6A 0%, #43A047 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+/* Input focus styles */
+.input-field {
+  transition: all 0.2s ease;
+}
+
+.input-field:focus {
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+/* Card styles */
+.auth-card {
+  background: linear-gradient(145deg, #E8F5E9 0%, #DCEDC8 100%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #C8E6C9;
+}
+
+/* Link hover styles */
+.link-hover {
+  transition: color 0.2s ease;
+}
+
+.link-hover:hover {
+  color: #388E3C;
 }
