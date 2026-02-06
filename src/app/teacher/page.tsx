@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import CreateTaskModal from '@/components/CreateTaskModal';
 
-// Assignment data
 const assignments = [
   {
     id: 1,
@@ -55,7 +54,6 @@ const assignments = [
   },
 ];
 
-// Sidebar navigation items
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/teacher' },
   { id: 'assignments', label: 'Assignments', icon: ClipboardList, href: '/teacher', active: true },
@@ -76,10 +74,10 @@ export default function TeacherDashboard() {
 
   const handleCreateTask = (taskData: { title: string; description: string; status: string; dueDate: string }) => {
     console.log('New task created:', taskData);
-    // Here you would typically send this to your backend
+  
   };
 
-  // Stats
+  
   const stats = {
     totalActive: 24,
     pendingReview: 128,
