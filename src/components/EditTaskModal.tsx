@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { X, ChevronDown } from 'lucide-react';
-import { tasksApi, classesApi, CreateTaskData, StudentOption, Class } from '@/lib/api';
+import { tasksApi, classesApi, Task, UpdateTaskData, StudentOption, Class } from '@/lib/api';
 
-interface CreateTaskModalProps {
+interface EditTaskModalProps {
   isOpen: boolean;
+  task: Task | null;
   onClose: () => void;
-  onCreated: () => void; // callback after successful creation
-  classes?: Class[];     // available classes to assign the task to
+  onUpdated: () => void;
+  classes?: Class[];
 }
 
 const priorityOptions: { value: 'low' | 'medium' | 'high'; label: string; color: string }[] = [
@@ -17,21 +18,43 @@ const priorityOptions: { value: 'low' | 'medium' | 'high'; label: string; color:
   { value: 'high', label: 'High', color: 'bg-red-100 text-red-700' },
 ];
 
-export default function CreateTaskModal({ isOpen, onClose, onCreated, classes = [] }: CreateTaskModalProps) {
+const statusOptions: { value: 'todo' | 'in-progress' | 'completed'; label: string }[] = [
+  { value: 'todo', label: 'To Do' },
+  { value: 'in-progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+];
+
+export default function EditTaskModal({ isOpen, task, onClose, onUpdated, classes = [] }: EditTaskModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [status, setStatus] = useState<'todo' | 'in-progress' | 'completed'>('todo');
   const [classId, setClassId] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [isPriorityOpen, setIsPriorityOpen] = useState(false);
+  const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isClassOpen, setIsClassOpen] = useState(false);
   const [isAssigneeOpen, setIsAssigneeOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch students — if a class is selected, fetch class members; otherwise fetch all students
+  // Populate form when task changes
+  useEffect(() => {
+    if (task) {
+      setTitle(task.title);
+      setDescription(task.description ?? '');
+      setDueDate(task.due_date ? task.due_date.split('T')[0] : '');
+      setPriority(task.priority);
+      setStatus(task.status);
+      setClassId(task.class_id ?? '');
+      setAssigneeId(task.assignee_id ?? '');
+      setError(null);
+    }
+  }, [task]);
+
+  // Fetch students — if a class is selected, fetch class members; otherwise all students
   useEffect(() => {
     if (!isOpen) return;
     const fetchStudents = async () => {
@@ -63,29 +86,15 @@ export default function CreateTaskModal({ isOpen, onClose, onCreated, classes = 
     fetchStudents();
   }, [isOpen, classId]);
 
-  // Reset assignee when class changes (student may not be in the new class)
-  useEffect(() => {
-    setAssigneeId('');
-  }, [classId]);
-
   const closeAllDropdowns = () => {
     setIsPriorityOpen(false);
+    setIsStatusOpen(false);
     setIsClassOpen(false);
     setIsAssigneeOpen(false);
   };
 
-  const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setDueDate('');
-    setPriority('medium');
-    setClassId('');
-    setAssigneeId('');
-    setError(null);
-    closeAllDropdowns();
-  };
-
   const handleSubmit = async () => {
+    if (!task) return;
     if (!title.trim()) {
       setError('Title is required');
       return;
@@ -94,43 +103,35 @@ export default function CreateTaskModal({ isOpen, onClose, onCreated, classes = 
     setError(null);
 
     try {
-      const data: CreateTaskData = {
+      const data: UpdateTaskData = {
         title: title.trim(),
         description: description.trim() || undefined,
         due_date: dueDate || undefined,
         priority,
-        assignee_id: assigneeId || undefined,
-        class_id: classId || undefined,
+        status,
+        assignee_id: assigneeId || null,
+        class_id: classId || null,
       };
-      await tasksApi.create(data);
-      resetForm();
-      onCreated();
+      await tasksApi.update(task.id, data);
+      onUpdated();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create task');
+      setError(err instanceof Error ? err.message : 'Failed to update task');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleCancel = () => {
-    resetForm();
-    onClose();
-  };
-
-  if (!isOpen) return null;
+  if (!isOpen || !task) return null;
 
   const selectedClass = classes.find((c) => c.id === classId);
   const selectedStudent = students.find((s) => s.id === assigneeId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70" onClick={onClose}></div>
 
-      {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 p-8">
-        {/* Close Button */}
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 p-8 max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 transition-colors"
@@ -138,10 +139,9 @@ export default function CreateTaskModal({ isOpen, onClose, onCreated, classes = 
           <X className="w-6 h-6" />
         </button>
 
-        {/* Header */}
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-green-600">Create New Task</h2>
-          <p className="text-gray-400">Fill in the details for your new task</p>
+          <h2 className="text-xl font-semibold text-green-600">Edit Task</h2>
+          <p className="text-gray-400">Update the task details</p>
         </div>
 
         {error && (
@@ -150,9 +150,8 @@ export default function CreateTaskModal({ isOpen, onClose, onCreated, classes = 
           </div>
         )}
 
-        {/* Form */}
         <div className="space-y-5">
-          {/* Title Field */}
+          {/* Title */}
           <div>
             <label className="block text-sm font-semibold text-gray-900 mb-2">
               Title <span className="text-red-500">*</span>
@@ -166,11 +165,9 @@ export default function CreateTaskModal({ isOpen, onClose, onCreated, classes = 
             />
           </div>
 
-          {/* Description Field */}
+          {/* Description */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
-              Description
-            </label>
+            <label className="block text-sm font-semibold text-gray-900 mb-2">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -180,17 +177,15 @@ export default function CreateTaskModal({ isOpen, onClose, onCreated, classes = 
             />
           </div>
 
-          {/* Priority and Due Date Row */}
+          {/* Priority + Status row */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Priority Field */}
+            {/* Priority */}
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Priority <span className="text-red-500">*</span>
-              </label>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Priority</label>
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => { setIsPriorityOpen(!isPriorityOpen); setIsClassOpen(false); setIsAssigneeOpen(false); }}
+                  onClick={() => { setIsPriorityOpen(!isPriorityOpen); setIsStatusOpen(false); setIsClassOpen(false); setIsAssigneeOpen(false); }}
                   className="w-full px-4 py-3 bg-green-50 border-0 rounded-lg text-left text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-between"
                 >
                   <span className="capitalize">{priority}</span>
@@ -215,40 +210,65 @@ export default function CreateTaskModal({ isOpen, onClose, onCreated, classes = 
               </div>
             </div>
 
-            {/* Due Date Field */}
+            {/* Status */}
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Due Date
-              </label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-4 py-3 bg-green-50 border-0 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-          </div>
-
-          {/* Class Field */}
-          {classes.length > 0 && (
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Class
-              </label>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Status</label>
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => { setIsClassOpen(!isClassOpen); setIsPriorityOpen(false); setIsAssigneeOpen(false); }}
+                  onClick={() => { setIsStatusOpen(!isStatusOpen); setIsPriorityOpen(false); setIsClassOpen(false); setIsAssigneeOpen(false); }}
                   className="w-full px-4 py-3 bg-green-50 border-0 rounded-lg text-left text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-between"
                 >
-                  <span>{selectedClass ? selectedClass.name : 'Select a class (optional)'}</span>
+                  <span>{statusOptions.find((s) => s.value === status)?.label}</span>
+                  <ChevronDown className="w-5 h-5 text-gray-400" />
+                </button>
+                {isStatusOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 overflow-hidden">
+                    {statusOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => { setStatus(opt.value); setIsStatusOpen(false); }}
+                        className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${status === opt.value ? 'bg-green-50 font-medium' : ''}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Due Date */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-900 mb-2">Due Date</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full px-4 py-3 bg-green-50 border-0 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+
+          {/* Class */}
+          {classes.length > 0 && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Class</label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => { setIsClassOpen(!isClassOpen); setIsPriorityOpen(false); setIsStatusOpen(false); setIsAssigneeOpen(false); }}
+                  className="w-full px-4 py-3 bg-green-50 border-0 rounded-lg text-left text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-between"
+                >
+                  <span>{selectedClass ? selectedClass.name : 'No class'}</span>
                   <ChevronDown className="w-5 h-5 text-gray-400" />
                 </button>
                 {isClassOpen && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
                     <button
                       type="button"
-                      onClick={() => { setClassId(''); setIsClassOpen(false); }}
+                      onClick={() => { setClassId(''); setAssigneeId(''); setIsClassOpen(false); }}
                       className="w-full px-4 py-3 text-left text-gray-500 hover:bg-gray-50 border-b border-gray-100"
                     >
                       No class
@@ -257,7 +277,7 @@ export default function CreateTaskModal({ isOpen, onClose, onCreated, classes = 
                       <button
                         key={c.id}
                         type="button"
-                        onClick={() => { setClassId(c.id); setIsClassOpen(false); }}
+                        onClick={() => { setClassId(c.id); setAssigneeId(''); setIsClassOpen(false); }}
                         className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${classId === c.id ? 'bg-green-50 font-medium' : ''}`}
                       >
                         <p className="text-sm font-medium text-gray-900">{c.name}</p>
@@ -270,23 +290,20 @@ export default function CreateTaskModal({ isOpen, onClose, onCreated, classes = 
             </div>
           )}
 
-          {/* Assignee Field */}
+          {/* Assignee */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
-              Assignee
-            </label>
+            <label className="block text-sm font-semibold text-gray-900 mb-2">Assignee</label>
             <div className="relative">
               <button
                 type="button"
-                onClick={() => { setIsAssigneeOpen(!isAssigneeOpen); setIsPriorityOpen(false); setIsClassOpen(false); }}
+                onClick={() => { const next = !isAssigneeOpen; closeAllDropdowns(); setIsAssigneeOpen(next); }}
                 className="w-full px-4 py-3 bg-green-50 border-0 rounded-lg text-left text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-between"
               >
-                <span>{selectedStudent ? `${selectedStudent.name} (${selectedStudent.email})` : 'Select a student (optional)'}</span>
+                <span>{selectedStudent ? `${selectedStudent.name} (${selectedStudent.email})` : 'No assignee'}</span>
                 <ChevronDown className="w-5 h-5 text-gray-400" />
               </button>
               {isAssigneeOpen && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                  {/* Unassign option */}
                   <button
                     type="button"
                     onClick={() => { setAssigneeId(''); setIsAssigneeOpen(false); }}
@@ -317,9 +334,9 @@ export default function CreateTaskModal({ isOpen, onClose, onCreated, classes = 
           <div className="grid grid-cols-2 gap-4 pt-4">
             <button
               type="button"
-              onClick={handleCancel}
+              onClick={onClose}
               disabled={submitting}
-              className="w-full py-3 bg-red-800 hover:bg-red-900 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
+              className="w-full py-3 bg-gray-200 hover:bg-gray-300 disabled:opacity-50 text-gray-700 font-medium rounded-lg transition-colors"
             >
               Cancel
             </button>
@@ -329,7 +346,7 @@ export default function CreateTaskModal({ isOpen, onClose, onCreated, classes = 
               disabled={submitting}
               className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
             >
-              {submitting ? 'Creating...' : 'Create Task'}
+              {submitting ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </div>

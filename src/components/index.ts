@@ -8,3 +8,4 @@ export { default as StatCard } from './StatCard';
 export { default as ClassCard } from './ClassCard';
 export { default as ProgressCard } from './ProgressCard';
 export { default as CreateTaskModal } from './CreateTaskModal';
+export { default as ProfileDropdown } from './ProfileDropdown';
