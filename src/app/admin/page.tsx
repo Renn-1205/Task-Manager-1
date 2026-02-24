@@ -263,7 +263,7 @@ export default function AdminDashboard() {
 
   // ── Class CRUD handlers ──
   const handleCreateClass = async (data: { name: string; description: string }) => {
-    await classesApi.create(data);
+    await classesApi.create(data.name, data.description);
     setIsCreateClassModalOpen(false);
     fetchAdminClasses();
     fetchStats();
